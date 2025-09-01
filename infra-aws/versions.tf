@@ -10,10 +10,4 @@ terraform {
       version = "~> 3.0"
     }
   }
-  backend "s3" {
-    # Configure remote state here (example)
-    bucket = var.state_bucket
-    key    = "terraform/terraform.tfstate"
-    region = var.region
-  }
 }
