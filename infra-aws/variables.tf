@@ -91,7 +91,7 @@ variable "eks_node_role_arn" {
 # S3
 variable "s3_buckets" {
   type    = map(any)
-  default = { app = { name = "app-bucket-${var.environment}" } }
+  default = { app = { name = "app-bucket-dev" } }
 }
 
 # Lambda
@@ -125,7 +125,7 @@ variable "service_names" {
 
 
 # ECR
-variable "service_names" {
-  description = "A list of microservice names to create ECR repositories for."
-  type        = list(string)
-}
+# variable "service_names" {
+#   description = "A list of microservice names to create ECR repositories for."
+#   type        = list(string)
+# }
