@@ -34,3 +34,5 @@ build/
 
 ## Local development environment variables
 .env
+/infra-aws/terraform.tfvars
+/learn-terra/
