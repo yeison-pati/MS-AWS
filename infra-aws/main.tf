@@ -79,3 +79,8 @@ module "cloudwatch" {
   source      = "./modules/cloudwatch"
   environment = var.environment
 }
+
+module "ecr" {
+  source        = "./modules/ecr"
+  service_names = var.service_names
+}

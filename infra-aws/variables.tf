@@ -41,6 +41,7 @@ variable "engine_mysql" {
 variable "db_username_postgres" {
   type    = string
   default = "admin"
+
 }
 variable "db_password_postgres" {
   type    = string
@@ -107,4 +108,24 @@ variable "lambda_package_file" {
   type    = string
   default = "lambda_function_payload.zip"
   
+}
+
+
+variable "service_names" {
+  description = "A list of microservice names."
+  type        = list(string)
+  default = [
+    "config-server",
+    "discovery-service",
+    "gateway",
+    "order-service",
+    "user-service"
+  ]
+}
+
+
+# ECR
+variable "service_names" {
+  description = "A list of microservice names to create ECR repositories for."
+  type        = list(string)
 }
