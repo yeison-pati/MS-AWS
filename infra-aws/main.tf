@@ -39,8 +39,6 @@ module "eks" {
   subnet_ids         = module.vpc.private_subnets
   node_count         = var.eks_node_count
   node_instance_type = var.eks_node_instance_type
-  cluster_role_arn   = var.eks_cluster_role_arn
-  node_role_arn      = var.eks_node_role_arn
 }
 
 
@@ -61,9 +59,10 @@ module "lambda" {
 }
 
 
-module "api_gateway" {
-  source      = "./modules/api_gateway"
+module "gateway" {
+  source      = "./modules/gateway"
   environment = var.environment
+  lambda_invoke_arn = module.lambda.lambda_invoke_arn
 }
 
 
