@@ -1,0 +1,72 @@
+version: '3.9'
+services:
+  discovery-service:
+    build: ./discovery-service
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - GIT_USERNAME=${GIT_USERNAME}
+      - GIT_PASSWORD=${GIT_PASSWORD}
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service:8761/eureka
+    depends_on:
+      config-server:
+        condition: service_healthy
+
+  user-service:
+    build: ./user-service
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service:8761/eureka
+      - USERS_HOST=${USERS_HOST}
+      - USERS_PORT=${USERS_PORT}
+      - USERS_DATABASE=${USERS_DATABASE}
+      - USERS_USER=${USERS_USER}
+      - USERS_PASSWORD=${USERS_PASSWORD}
+    depends_on:
+      config-server:
+        condition: service_healthy
+
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service:8761/eureka
+      - ORDERS_HOST=${ORDERS_HOST}
+      - ORDERS_PORT=${ORDERS_PORT}
+      - ORDERS_DATABASE=${ORDERS_DATABASE}
+      - ORDERS_USER=${ORDERS_USER}
+      - ORDERS_PASSWORD=${ORDERS_PASSWORD}
+    depends_on:
+      config-server:
+        condition: service_healthy

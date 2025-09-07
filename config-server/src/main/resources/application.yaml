@@ -1,0 +1,23 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/yeison-pati/config-repo.git
+          default-label: main
+          username: ${GIT_USERNAME}
+          password: ${GIT_PASSWORD}
+          ###aws-secretsmanager:
+          ###enabled: false
+          ###region: us-east-1
+          ###prefix: /microservices/
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-service:8761/eureka

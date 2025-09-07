@@ -1,0 +1,110 @@
+name: Deploy Microservices
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    outputs:
+      tf_outputs: ${{ steps.tf-outputs.outputs.tf_outputs }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        id: init
+        run: terraform -chdir=infra-aws init
+
+      - name: Terraform Plan
+        id: plan
+        env:
+            TF_LOG: DEBUG
+        run: terraform -chdir=infra-aws plan -no-color
+
+      - name: Terraform Apply
+        id: apply
+        env:
+          TF_LOG: DEBUG
+        run: terraform -chdir=infra-aws apply -auto-approve
+
+      - name: Get Terraform Outputs
+        id: tf-outputs
+        run: echo "tf_outputs=$(terraform -chdir=infra-aws output -json)" >> $GITHUB_OUTPUT
+
+  build-and-push-images:
+    needs: terraform
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ "config-server", "discovery-service", "gateway", "order-service", "user-service" ]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY_URLS: ${{ needs.terraform.outputs.tf_outputs }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          REPO_URL=$(echo $ECR_REPOSITORY_URLS | jq -r ".ecr_repository_urls.value[\"${{ matrix.service }}\"]")
+          docker build -t $REPO_URL:$IMAGE_TAG ./${{ matrix.service }}
+          docker push $REPO_URL:$IMAGE_TAG
+
+  deploy-to-eks:
+    needs: [terraform, build-and-push-images]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Set up Kubeconfig
+        run: |
+          CLUSTER_NAME=$(echo '${{ needs.terraform.outputs.tf_outputs }}' | jq -r ".eks_cluster_name.value")
+          aws eks update-kubeconfig --name $CLUSTER_NAME --region ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to EKS
+        env:
+          ECR_REPOSITORY_URLS: ${{ needs.terraform.outputs.tf_outputs }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          for service in config-server discovery-service gateway order-service user-service; do
+            REPO_URL=$(echo $ECR_REPOSITORY_URLS | jq -r ".ecr_repository_urls.value[\"$service\"]")
+            IMAGE_URL_WITH_TAG="$REPO_URL:$IMAGE_TAG"
+            
+            # Replace placeholder in deployment.yml
+            sed -i "s|__IMAGE_URL__|$IMAGE_URL_WITH_TAG|g" kubernetes/$service/deployment.yml
+            
+            # Apply the manifests
+            kubectl apply -f kubernetes/$service/
+          done
