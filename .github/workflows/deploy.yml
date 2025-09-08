@@ -157,5 +157,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
+      - name: Terraform init
+        run: terraform -chdir=terraform init
       - name: Destroy infra
         run: terraform -chdir=terraform destroy -auto-approve
