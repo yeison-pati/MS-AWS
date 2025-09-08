@@ -44,32 +44,30 @@ jobs:
       - name: Get Terraform Outputs
         id: tf-outputs
         run: |
-          # Obtener outputs como JSON y extraer valores individuales
+          # Obtener outputs como JSON
           TF_OUTPUTS=$(terraform -chdir=terraform output -json)
-          
-          echo "ECR_REPO_CONFIG_SERVER=$(echo $TF_OUTPUTS | jq -r '.ecr_repository_urls.value["config-server"]')" >> $GITHUB_ENV
-          echo "ECR_REPO_DISCOVERY_SERVICE=$(echo $TF_OUTPUTS | jq -r '.ecr_repository_urls.value["discovery-service"]')" >> $GITHUB_ENV
-          echo "ECR_REPO_GATEWAY=$(echo $TF_OUTPUTS | jq -r '.ecr_repository_urls.value["gateway"]')" >> $GITHUB_ENV
-          echo "ECR_REPO_ORDER_SERVICE=$(echo $TF_OUTPUTS | jq -r '.ecr_repository_urls.value["order-service"]')" >> $GITHUB_ENV
-          echo "ECR_REPO_USER_SERVICE=$(echo $TF_OUTPUTS | jq -r '.ecr_repository_urls.value["user-service"]')" >> $GITHUB_ENV
-          
-          echo "EKS_CLUSTER_NAME=$(echo $TF_OUTPUTS | jq -r '.eks_cluster_name.value')" >> $GITHUB_ENV
-          echo "EKS_CLUSTER_ENDPOINT=$(echo $TF_OUTPUTS | jq -r '.eks_cluster_endpoint.value')" >> $GITHUB_ENV
 
-          echo "mysql_rds_endpoint=$(echo $TF_OUTPUTS | jq -r '.mysql_rds_endpoint.value')" >> $GITHUB_ENV
-          echo "mysql_rds_port=$(echo $TF_OUTPUTS | jq -r '.mysql_rds_port.value')" >> $GITHUB_ENV
-          echo "mysql_rds_db_name=$(echo $TF_OUTPUTS | jq -r '.mysql_rds_db_name.value')" >> $GITHUB_ENV
-          echo "mysql_rds_username=$(echo $TF_OUTPUTS | jq -r '.mysql_rds_username.value')" >> $GITHUB_ENV
-          echo "mysql_rds_password=$(echo $TF_OUTPUTS | jq -r '.mysql_rds_password.value')" >> $GITHUB_ENV
+          echo "ECR_REPO_CONFIG_SERVER=$(echo "$TF_OUTPUTS" | jq -r '.ecr_repository_urls.value["config-server"]')" >> $GITHUB_ENV
+          echo "ECR_REPO_DISCOVERY_SERVICE=$(echo "$TF_OUTPUTS" | jq -r '.ecr_repository_urls.value["discovery-service"]')" >> $GITHUB_ENV
+          echo "ECR_REPO_GATEWAY=$(echo "$TF_OUTPUTS" | jq -r '.ecr_repository_urls.value["gateway"]')" >> $GITHUB_ENV
+          echo "ECR_REPO_ORDER_SERVICE=$(echo "$TF_OUTPUTS" | jq -r '.ecr_repository_urls.value["order-service"]')" >> $GITHUB_ENV
+          echo "ECR_REPO_USER_SERVICE=$(echo "$TF_OUTPUTS" | jq -r '.ecr_repository_urls.value["user-service"]')" >> $GITHUB_ENV
 
-          echo "postgres_rds_endpoint=$(echo $TF_OUTPUTS | jq -r '.postgres_rds_endpoint.value')" >> $GITHUB_ENV
-          echo "postgres_rds_port=$(echo $TF_OUTPUTS | jq -r '.postgres_rds_port.value')" >> $GITHUB_ENV
-          echo "postgres_rds_db_name=$(echo $TF_OUTPUTS | jq -r '.postgres_rds_db_name.value')" >> $GITHUB_ENV
-          echo "postgres_rds_username=$(echo $TF_OUTPUTS | jq -r '.postgres_rds_username.value')" >> $GITHUB_ENV
-          echo "postgres_rds_password=$(echo $TF_OUTPUTS | jq -r '.postgres_rds_password.value')" >> $GITHUB_ENV
+          echo "EKS_CLUSTER_NAME=$(echo "$TF_OUTPUTS" | jq -r '.eks_cluster_name.value')" >> $GITHUB_ENV
+          echo "EKS_CLUSTER_ENDPOINT=$(echo "$TF_OUTPUTS" | jq -r '.eks_cluster_endpoint.value')" >> $GITHUB_ENV
 
-          # También pasamos todos los outputs como JSON al siguiente job (opcional)
-          echo "tf_outputs=$TF_OUTPUTS" >> $GITHUB_OUTPUT
+          echo "mysql_rds_endpoint=$(echo "$TF_OUTPUTS" | jq -r '.mysql_rds_endpoint.value')" >> $GITHUB_ENV
+          echo "mysql_rds_port=$(echo "$TF_OUTPUTS" | jq -r '.mysql_rds_port.value')" >> $GITHUB_ENV
+          echo "mysql_rds_db_name=$(echo "$TF_OUTPUTS" | jq -r '.mysql_rds_db_name.value')" >> $GITHUB_ENV
+          echo "mysql_rds_username=$(echo "$TF_OUTPUTS" | jq -r '.mysql_rds_username.value')" >> $GITHUB_ENV
+          echo "mysql_rds_password=$(echo "$TF_OUTPUTS" | jq -r '.mysql_rds_password.value')" >> $GITHUB_ENV
+
+          echo "postgres_rds_endpoint=$(echo "$TF_OUTPUTS" | jq -r '.postgres_rds_endpoint.value')" >> $GITHUB_ENV
+          echo "postgres_rds_port=$(echo "$TF_OUTPUTS" | jq -r '.postgres_rds_port.value')" >> $GITHUB_ENV
+          echo "postgres_rds_db_name=$(echo "$TF_OUTPUTS" | jq -r '.postgres_rds_db_name.value')" >> $GITHUB_ENV
+          echo "postgres_rds_username=$(echo "$TF_OUTPUTS" | jq -r '.postgres_rds_username.value')" >> $GITHUB_ENV
+          echo "postgres_rds_password=$(echo "$TF_OUTPUTS" | jq -r '.postgres_rds_password.value')" >> $GITHUB_ENV
+
 
   build-and-push-images:
     needs: terraform
