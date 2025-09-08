@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tf_outputs: ${{ steps.tf-outputs.outputs.tf_outputs }}
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -68,6 +71,9 @@ jobs:
     strategy:
       matrix:
         service: [ "config-server", "discovery-service", "gateway", "order-service", "user-service" ]
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -109,6 +115,9 @@ jobs:
   deploy-to-eks:
     needs: [terraform, build-and-push-images]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -147,6 +156,9 @@ jobs:
     needs: [terraform, build-and-push-images, deploy-to-eks]
     if: failure()
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
