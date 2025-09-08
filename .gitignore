@@ -47,3 +47,6 @@ LICENSE.txt
 *.tfstate.*
 .terraform/
 .terraform.lock.hcl
+
+# personal files
+*.txt
