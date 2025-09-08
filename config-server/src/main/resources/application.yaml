@@ -12,10 +12,6 @@ spring:
           default-label: main
           username: ${GIT_USERNAME}
           password: ${GIT_PASSWORD}
-          ###aws-secretsmanager:
-          ###enabled: false
-          ###region: us-east-1
-          ###prefix: /microservices/
 
 eureka:
   client:

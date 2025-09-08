@@ -34,7 +34,7 @@ build/
 
 ## Local development environment variables
 .env
-/infra-aws/terraform.tfvars
+/terraform/terraform.tfvars
 /learn-terra/
 
 # Ignore Terraform binary and related files

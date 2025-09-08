@@ -46,11 +46,11 @@ services:
       - "8081:8081"
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service:8761/eureka
-      - USERS_HOST=${USERS_HOST}
-      - USERS_PORT=${USERS_PORT}
-      - USERS_DATABASE=${USERS_DATABASE}
-      - USERS_USER=${USERS_USER}
-      - USERS_PASSWORD=${USERS_PASSWORD}
+      - mysql_rds_endpoint=${mysql_rds_endpoint}
+      - mysql_rds_port=${mysql_rds_port}
+      - mysql_rds_db_name=${mysql_rds_db_name}
+      - mysql_rds_username=${mysql_rds_username}
+      - mysql_rds_password=${mysql_rds_password}
     depends_on:
       config-server:
         condition: service_healthy
@@ -62,11 +62,11 @@ services:
       - "8082:8082"
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service:8761/eureka
-      - ORDERS_HOST=${ORDERS_HOST}
-      - ORDERS_PORT=${ORDERS_PORT}
-      - ORDERS_DATABASE=${ORDERS_DATABASE}
-      - ORDERS_USER=${ORDERS_USER}
-      - ORDERS_PASSWORD=${ORDERS_PASSWORD}
+      - postgres_rds_db_name=${postgres_rds_db_name}
+      - postgres_rds_port=${postgres_rds_port}
+      - postgres_rds_username=${postgres_rds_username}
+      - postgres_rds_password=${postgres_rds_password}
+      - postgres_rds_endpoint=${postgres_rds_endpoint}
     depends_on:
       config-server:
         condition: service_healthy
