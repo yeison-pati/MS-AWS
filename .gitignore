@@ -38,7 +38,8 @@ build/
 /learn-terra/
 
 # Ignore Terraform binary and related files
-terraform
+*.tfplan
+*.tfplan.*
 terraform_*.zip
 LICENSE.txt
 
