@@ -1,22 +1,9 @@
-resource "random_password" "db_password_postgres" {
+resource "random_password" "db_password" {
   length  = 16
   special = false
 }
 
-resource "random_password" "db_password_mysql" {
-  length  = 16
-  special = false
-}
-
-resource "random_string" "db_username_postgres" {
-  length  = 8
-  upper   = true
-  lower   = true
-  numeric = false
-  special = false
-}
-
-resource "random_string" "db_username_mysql" {
+resource "random_string" "db_username" {
   length  = 8
   upper   = true
   lower   = true
@@ -42,8 +29,8 @@ module "postgres" {
   source            = "./modules/postgres"
   environment       = var.environment
   engine            = var.engine_postgres
-  username          = random_string.db_username_postgres.result
-  password          = random_password.db_password_postgres.result
+  username          = random_string.db_username.result
+  password          = random_password.db_password.result
   allocated_storage = var.db_allocated_storage_postgres
   vpc_id            = module.vpc.vpc_id
   subnet_ids        = module.vpc.private_subnets
@@ -57,8 +44,8 @@ module "mysql" {
   source            = "./modules/mysql"
   environment       = var.environment
   engine            = var.engine_mysql
-  username          = random_string.db_username_mysql.result
-  password          = random_password.db_password_mysql.result
+  username          = random_string.db_username.result
+  password          = random_password.db_password.result
   allocated_storage = var.db_allocated_storage_mysql
   vpc_id            = module.vpc.vpc_id
   subnet_ids        = module.vpc.private_subnets
@@ -73,8 +60,8 @@ module "eks" {
   source             = "./modules/eks"
   cluster_name       = "my-eks-cluster-${var.environment}"
   vpc_id             = module.vpc.vpc_id
-  public_subnets     = module.vpc.public_subnets   # CORRECCIÓN: Pasar subredes públicas
-  private_subnets    = module.vpc.private_subnets  # CORRECCIÓN: Pasar subredes privadas
+  public_subnets     = module.vpc.public_subnets
+  private_subnets    = module.vpc.private_subnets
   node_count         = var.eks_node_count
   node_instance_type = var.eks_node_instance_type
 }

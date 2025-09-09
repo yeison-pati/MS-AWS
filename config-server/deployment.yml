@@ -19,3 +19,76 @@ spec:
         image: __IMAGE_URL__
         ports:
         - containerPort: 8888
+        env:
+        - name: GIT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: GIT_USERNAME
+        - name: GIT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: GIT_PASSWORD
+        - name: postgres_rds_endpoint
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: postgres_rds_endpoint
+        - name: postgres_rds_port
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: postgres_rds_port
+        - name: postgres_rds_username
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: postgres_rds_username
+        - name: postgres_rds_password
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: postgres_rds_password
+        - name: postgres_rds_db_name
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: postgres_rds_db_name
+        - name: mysql_rds_endpoint
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: mysql_rds_endpoint
+        - name: mysql_rds_port
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: mysql_rds_port
+        - name: mysql_rds_username
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: mysql_rds_username
+        - name: mysql_rds_password
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: mysql_rds_password
+        - name: mysql_rds_db_name
+          valueFrom:
+            secretKeyRef:
+              name: config-server-secret
+              key: mysql_rds_db_name
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8888
+          initialDelaySeconds: 90
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8888
+          initialDelaySeconds: 60
+          periodSeconds: 10

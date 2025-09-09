@@ -21,13 +21,11 @@ output "postgres_rds_endpoint" {
 output "postgres_rds_port" {
   description = "El puerto de la base de datos PostgreSQL."
   value       = module.postgres.port
-  
 }
 
 output "postgres_rds_db_name" {
   description = "El nombre de la base de datos PostgreSQL."
   value       = module.postgres.db_name
-
 }
 
 output "postgres_rds_username" {
