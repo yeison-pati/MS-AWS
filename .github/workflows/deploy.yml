@@ -7,8 +7,6 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    outputs:
-      tf_outputs: ${{ steps.tf-outputs.outputs.tf_outputs }}
     permissions:
       id-token: write
       contents: read
@@ -40,11 +38,22 @@ jobs:
         run: terraform -chdir=terraform apply -auto-approve
 
       - name: Get Terraform Outputs
-        id: tf-outputs
         run: |
-          echo 'tf_outputs<<EOF' >> $GITHUB_OUTPUT
-          terraform -chdir=terraform output -json >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+          terraform -chdir=terraform output -json > tf_outputs.json
+          # Verificar que el archivo se generó correctamente
+          if [[ ! -s tf_outputs.json ]]; then
+            echo "Error: tf_outputs.json is empty or doesn't exist"
+            exit 1
+          fi
+          echo "Terraform outputs saved successfully"
+
+      - name: Upload tf_outputs.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf_outputs
+          path: tf_outputs.json
+          retention-days: 1
+
 
   build-and-push-images:
     needs: terraform
@@ -71,13 +80,48 @@ jobs:
         with:
           mask-password: true
 
+      - name: Download tf_outputs.json
+        uses: actions/download-artifact@v4
+        with:
+          name: tf_outputs
+          path: .
+
+      - name: Load outputs and validate
+        run: |
+          # Verificar que el archivo existe y tiene contenido
+          if [[ ! -f tf_outputs.json ]] || [[ ! -s tf_outputs.json ]]; then
+            echo "Error: tf_outputs.json not found or empty"
+            exit 1
+          fi
+          
+          # Cargar outputs y verificar estructura
+          TF_OUTPUTS=$(cat tf_outputs.json)
+          
+          # Verificar que podemos extraer la URL del repositorio
+          REPO_URL=$(echo "$TF_OUTPUTS" | jq -r ".ecr_repository_urls.value[\"${{ matrix.service }}\"]" 2>/dev/null)
+          if [[ "$REPO_URL" == "null" || -z "$REPO_URL" ]]; then
+            echo "Error: Cannot extract ECR repository URL for ${{ matrix.service }}"
+            echo "Available services in outputs:"
+            echo "$TF_OUTPUTS" | jq -r ".ecr_repository_urls.value | keys[]" 2>/dev/null || echo "Failed to parse ECR repositories"
+            exit 1
+          fi
+          
+          echo "TF_OUTPUTS=$TF_OUTPUTS" >> $GITHUB_ENV
+          echo "Repository URL for ${{ matrix.service }}: $REPO_URL"
+
       - name: Build, tag, and push image to Amazon ECR
         env:
-          TF_OUTPUTS: ${{ needs.terraform.outputs.tf_outputs }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           REPO_URL=$(echo "$TF_OUTPUTS" | jq -r ".ecr_repository_urls.value[\"${{ matrix.service }}\"]")
           echo "Building and pushing image for ${{ matrix.service }} -> $REPO_URL:$IMAGE_TAG"
+          
+          # Verificar que tenemos una URL válida antes de construir
+          if [[ -z "$REPO_URL" || "$REPO_URL" == "null" ]]; then
+            echo "Error: Invalid repository URL"
+            exit 1
+          fi
+          
           docker build -t $REPO_URL:$IMAGE_TAG ./${{ matrix.service }}
           docker push $REPO_URL:$IMAGE_TAG
 
@@ -97,9 +141,33 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Download tf_outputs.json
+        uses: actions/download-artifact@v4
+        with:
+          name: tf_outputs
+          path: .
+
+      - name: Load outputs and validate
+        run: |
+          # Verificar archivo
+          if [[ ! -f tf_outputs.json ]] || [[ ! -s tf_outputs.json ]]; then
+            echo "Error: tf_outputs.json not found or empty"
+            exit 1
+          fi
+          
+          TF_OUTPUTS=$(cat tf_outputs.json)
+          echo "TF_OUTPUTS=$TF_OUTPUTS" >> $GITHUB_ENV
+          
+          # Verificar cluster name
+          CLUSTER_NAME=$(echo "$TF_OUTPUTS" | jq -r ".eks_cluster_name.value" 2>/dev/null)
+          if [[ "$CLUSTER_NAME" == "null" || -z "$CLUSTER_NAME" ]]; then
+            echo "Error: Cannot extract EKS cluster name"
+            exit 1
+          fi
+          echo "EKS Cluster: $CLUSTER_NAME"
+
       - name: Deploy to EKS
         env:
-          TF_OUTPUTS: ${{ needs.terraform.outputs.tf_outputs }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -e
@@ -118,8 +186,11 @@ jobs:
             
             echo "Deploying $service with image $IMAGE_URL_WITH_TAG"
             
-            # Reemplazar placeholder de imagen en deployment.yml
-            sed -i "s|__IMAGE_URL__|$IMAGE_URL_WITH_TAG|g" $service/deployment.yml
+            # Crear una copia temporal del deployment para no modificar el original
+            cp $service/deployment.yml $service/deployment-temp.yml
+            
+            # Reemplazar placeholder de imagen en deployment temporal
+            sed -i "s|__IMAGE_URL__|$IMAGE_URL_WITH_TAG|g" $service/deployment-temp.yml
             
             # Si es config-server, crear el secret con las credenciales
             if [[ "$service" == "config-server" ]]; then
@@ -157,8 +228,18 @@ jobs:
                 --dry-run=client -o yaml | kubectl apply -f -
             fi
             
-            # Aplicar configuración de Kubernetes
-            kubectl apply -f $service/ || { echo "Error: Failed to deploy $service"; exit 1; }
+            # Aplicar configuración de Kubernetes usando el archivo temporal
+            kubectl apply -f $service/deployment-temp.yml || { echo "Error: Failed to deploy $service"; exit 1; }
+            
+            # Aplicar otros archivos del servicio (services, configmaps, etc.)
+            for file in $service/*.yml; do
+              if [[ "$file" != "$service/deployment.yml" && "$file" != "$service/deployment-temp.yml" ]]; then
+                kubectl apply -f "$file" || echo "Warning: Failed to apply $file"
+              fi
+            done
+            
+            # Limpiar archivo temporal
+            rm -f $service/deployment-temp.yml
           done
   
   cleanup:
@@ -180,6 +261,8 @@ jobs:
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
       
       - name: Terraform init
         run: terraform -chdir=terraform init
