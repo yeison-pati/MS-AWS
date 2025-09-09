@@ -88,42 +88,36 @@ jobs:
 
       - name: Load outputs and validate
         run: |
-          # Verificar que el archivo existe y tiene contenido
           if [[ ! -f tf_outputs.json ]] || [[ ! -s tf_outputs.json ]]; then
             echo "Error: tf_outputs.json not found or empty"
             exit 1
           fi
-          
-          # Cargar outputs y verificar estructura
-          TF_OUTPUTS=$(cat tf_outputs.json)
-          
-          # Verificar que podemos extraer la URL del repositorio
-          REPO_URL=$(echo "$TF_OUTPUTS" | jq -r ".ecr_repository_urls.value[\"${{ matrix.service }}\"]" 2>/dev/null)
+
+          REPO_URL=$(jq -r ".ecr_repository_urls.value[\"${{ matrix.service }}\"]" tf_outputs.json)
           if [[ "$REPO_URL" == "null" || -z "$REPO_URL" ]]; then
             echo "Error: Cannot extract ECR repository URL for ${{ matrix.service }}"
             echo "Available services in outputs:"
-            echo "$TF_OUTPUTS" | jq -r ".ecr_repository_urls.value | keys[]" 2>/dev/null || echo "Failed to parse ECR repositories"
+            jq -r ".ecr_repository_urls.value | keys[]" tf_outputs.json || echo "Failed to parse ECR repositories"
             exit 1
           fi
-          
-          echo "TF_OUTPUTS=$TF_OUTPUTS" >> $GITHUB_ENV
+
           echo "Repository URL for ${{ matrix.service }}: $REPO_URL"
 
       - name: Build, tag, and push image to Amazon ECR
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          REPO_URL=$(echo "$TF_OUTPUTS" | jq -r ".ecr_repository_urls.value[\"${{ matrix.service }}\"]")
+          REPO_URL=$(jq -r ".ecr_repository_urls.value[\"${{ matrix.service }}\"]" tf_outputs.json)
           echo "Building and pushing image for ${{ matrix.service }} -> $REPO_URL:$IMAGE_TAG"
-          
-          # Verificar que tenemos una URL válida antes de construir
+
           if [[ -z "$REPO_URL" || "$REPO_URL" == "null" ]]; then
             echo "Error: Invalid repository URL"
             exit 1
           fi
-          
+
           docker build -t $REPO_URL:$IMAGE_TAG ./${{ matrix.service }}
           docker push $REPO_URL:$IMAGE_TAG
+
 
   deploy-to-eks:
     needs: [terraform, build-and-push-images]
@@ -149,17 +143,12 @@ jobs:
 
       - name: Load outputs and validate
         run: |
-          # Verificar archivo
           if [[ ! -f tf_outputs.json ]] || [[ ! -s tf_outputs.json ]]; then
             echo "Error: tf_outputs.json not found or empty"
             exit 1
           fi
-          
-          TF_OUTPUTS=$(cat tf_outputs.json)
-          echo "TF_OUTPUTS=$TF_OUTPUTS" >> $GITHUB_ENV
-          
-          # Verificar cluster name
-          CLUSTER_NAME=$(echo "$TF_OUTPUTS" | jq -r ".eks_cluster_name.value" 2>/dev/null)
+
+          CLUSTER_NAME=$(jq -r ".eks_cluster_name.value" tf_outputs.json)
           if [[ "$CLUSTER_NAME" == "null" || -z "$CLUSTER_NAME" ]]; then
             echo "Error: Cannot extract EKS cluster name"
             exit 1
@@ -171,47 +160,32 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -e
-          # Obtener el nombre del cluster desde los outputs de Terraform
-          CLUSTER_NAME=$(echo "$TF_OUTPUTS" | jq -r ".eks_cluster_name.value")
-          [[ "$CLUSTER_NAME" != "null" && -n "$CLUSTER_NAME" ]] || { echo "Error: Failed to get cluster name"; exit 1; }
-          
-          # Configurar kubeconfig
+          CLUSTER_NAME=$(jq -r ".eks_cluster_name.value" tf_outputs.json)
           aws eks update-kubeconfig --name $CLUSTER_NAME --region ${{ secrets.AWS_REGION }}
-          
-          # Desplegar cada servicio
+
           for service in config-server discovery-service gateway order-service user-service; do
-            REPO_URL=$(echo "$TF_OUTPUTS" | jq -r ".ecr_repository_urls.value[\"$service\"]")
+            REPO_URL=$(jq -r ".ecr_repository_urls.value[\"$service\"]" tf_outputs.json)
             [[ "$REPO_URL" != "null" && -n "$REPO_URL" ]] || { echo "Error: Failed to get repo URL for $service"; exit 1; }
             IMAGE_URL_WITH_TAG="$REPO_URL:$IMAGE_TAG"
-            
+
             echo "Deploying $service with image $IMAGE_URL_WITH_TAG"
-            
-            # Crear una copia temporal del deployment para no modificar el original
+
             cp $service/deployment.yml $service/deployment-temp.yml
-            
-            # Reemplazar placeholder de imagen en deployment temporal
             sed -i "s|__IMAGE_URL__|$IMAGE_URL_WITH_TAG|g" $service/deployment-temp.yml
-            
-            # Si es config-server, crear el secret con las credenciales
+
             if [[ "$service" == "config-server" ]]; then
-              # Extraer variables de los outputs de Terraform
-              POSTGRES_ENDPOINT=$(echo "$TF_OUTPUTS" | jq -r ".postgres_rds_endpoint.value")
-              POSTGRES_PORT=$(echo "$TF_OUTPUTS" | jq -r ".postgres_rds_port.value")
-              POSTGRES_USERNAME=$(echo "$TF_OUTPUTS" | jq -r ".postgres_rds_username.value")
-              POSTGRES_PASSWORD=$(echo "$TF_OUTPUTS" | jq -r ".postgres_rds_password.value")
-              POSTGRES_DB=$(echo "$TF_OUTPUTS" | jq -r ".postgres_rds_db_name.value")
-              
-              MYSQL_ENDPOINT=$(echo "$TF_OUTPUTS" | jq -r ".mysql_rds_endpoint.value")
-              MYSQL_PORT=$(echo "$TF_OUTPUTS" | jq -r ".mysql_rds_port.value")
-              MYSQL_USERNAME=$(echo "$TF_OUTPUTS" | jq -r ".mysql_rds_username.value")
-              MYSQL_PASSWORD=$(echo "$TF_OUTPUTS" | jq -r ".mysql_rds_password.value")
-              MYSQL_DB=$(echo "$TF_OUTPUTS" | jq -r ".mysql_rds_db_name.value")
-              
-              # Validar valores extraídos
-              [[ "$POSTGRES_ENDPOINT" != "null" && -n "$POSTGRES_ENDPOINT" ]] || { echo "Error: Failed to get Postgres endpoint"; exit 1; }
-              [[ "$MYSQL_ENDPOINT" != "null" && -n "$MYSQL_ENDPOINT" ]] || { echo "Error: Failed to get MySQL endpoint"; exit 1; }
-              
-              # Crear secret de Kubernetes con todas las credenciales
+              POSTGRES_ENDPOINT=$(jq -r ".postgres_rds_endpoint.value" tf_outputs.json)
+              POSTGRES_PORT=$(jq -r ".postgres_rds_port.value" tf_outputs.json)
+              POSTGRES_USERNAME=$(jq -r ".postgres_rds_username.value" tf_outputs.json)
+              POSTGRES_PASSWORD=$(jq -r ".postgres_rds_password.value" tf_outputs.json)
+              POSTGRES_DB=$(jq -r ".postgres_rds_db_name.value" tf_outputs.json)
+
+              MYSQL_ENDPOINT=$(jq -r ".mysql_rds_endpoint.value" tf_outputs.json)
+              MYSQL_PORT=$(jq -r ".mysql_rds_port.value" tf_outputs.json)
+              MYSQL_USERNAME=$(jq -r ".mysql_rds_username.value" tf_outputs.json)
+              MYSQL_PASSWORD=$(jq -r ".mysql_rds_password.value" tf_outputs.json)
+              MYSQL_DB=$(jq -r ".mysql_rds_db_name.value" tf_outputs.json)
+
               kubectl create secret generic config-server-secret \
                 --from-literal=GIT_USERNAME="${{ secrets.GIT_USERNAME }}" \
                 --from-literal=GIT_PASSWORD="${{ secrets.GIT_PASSWORD }}" \
@@ -227,18 +201,13 @@ jobs:
                 --from-literal=mysql_rds_db_name="$MYSQL_DB" \
                 --dry-run=client -o yaml | kubectl apply -f -
             fi
-            
-            # Aplicar configuración de Kubernetes usando el archivo temporal
-            kubectl apply -f $service/deployment-temp.yml || { echo "Error: Failed to deploy $service"; exit 1; }
-            
-            # Aplicar otros archivos del servicio (services, configmaps, etc.)
+
+            kubectl apply -f $service/deployment-temp.yml
             for file in $service/*.yml; do
               if [[ "$file" != "$service/deployment.yml" && "$file" != "$service/deployment-temp.yml" ]]; then
                 kubectl apply -f "$file" || echo "Warning: Failed to apply $file"
               fi
             done
-            
-            # Limpiar archivo temporal
             rm -f $service/deployment-temp.yml
           done
   
