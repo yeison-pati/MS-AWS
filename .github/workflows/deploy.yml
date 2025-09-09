@@ -39,7 +39,10 @@ jobs:
 
       - name: Get Terraform Outputs
         id: tf-outputs
-        run: echo "tf_outputs=$(terraform -chdir=terraform output -json)" >> $GITHUB_OUTPUT
+        run: |
+          echo 'tf_outputs<<EOF' >> $GITHUB_OUTPUT
+          terraform -chdir=terraform output -json >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
 
   build-and-push-images:
     needs: terraform
